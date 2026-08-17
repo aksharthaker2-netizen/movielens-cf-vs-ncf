@@ -20,7 +20,7 @@ if __name__ == "__main__":
     trainset = train_data.build_full_trainset()
 
     # Tuned hyperparameters from Day 5 grid search
-    best_params = {'n_factors': 100, 'n_epochs': 30, 'lr_all': 0.01, 'reg_all': 0.1}
+    best_params = {'n_factors': 150, 'n_epochs': 40, 'lr_all': 0.005, 'reg_all': 0.05}
     model = SVD(**best_params)
     model.fit(trainset)
 

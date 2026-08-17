@@ -11,10 +11,10 @@ if __name__ == "__main__":
     train_data = to_surprise_dataset(train_df)
 
     param_grid = {
-        "n_factors": [50, 100],
-        "n_epochs": [20, 30],
-        "lr_all": [0.005, 0.01],
-        "reg_all": [0.02, 0.1]
+        "n_factors": [50, 100, 150],
+        "n_epochs": [20, 30, 40],
+        "lr_all": [0.005, 0.01, 0.02],
+        "reg_all": [0.02, 0.05, 0.1]
     }
 
     gs = GridSearchCV(
