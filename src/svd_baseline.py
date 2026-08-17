@@ -16,17 +16,15 @@ if __name__ == "__main__":
     ratings = load_ratings()
     train_df, test_df = time_based_split(ratings, test_frac=0.2)
 
-    # Build surprise training set from our train split
     train_data = to_surprise_dataset(train_df)
     trainset = train_data.build_full_trainset()
 
-    # Untuned SVD model - default hyperparameters, just to prove it runs
-    model = SVD()
+    # Tuned hyperparameters from Day 5 grid search
+    best_params = {'n_factors': 100, 'n_epochs': 30, 'lr_all': 0.01, 'reg_all': 0.1}
+    model = SVD(**best_params)
     model.fit(trainset)
 
-    # Build test set in surprise's expected format: list of (user, item, true_rating) tuples
     testset = list(test_df[["user_id", "movie_id", "rating"]].itertuples(index=False, name=None))
-
     predictions = model.test(testset)
 
     rmse = accuracy.rmse(predictions)
