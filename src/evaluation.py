@@ -59,6 +59,23 @@ def precision_recall_at_k(recommendations, test_df, k=10, rating_threshold=4.0):
         recalls.append(recall)
 
     return np.mean(precisions), np.mean(recalls)
+def get_popularity_baseline_recommendations(train_df, user_ids, k=10):
+    """
+    Non-personalized baseline: recommend the k globally most-rated movies
+    to every user (excluding movies they've already rated in training).
+    """
+    # Rank movies by how many times they were rated in training (proxy for popularity)
+    movie_popularity = train_df["movie_id"].value_counts()
+    most_popular = movie_popularity.index.tolist()  # already sorted, most popular first
+
+    recommendations = {}
+    for user_id in user_ids:
+        rated_movies = set(train_df[train_df["user_id"] == user_id]["movie_id"])
+        candidates = [m for m in most_popular if m not in rated_movies]
+        # Fake a predicted-rating value (just rank position) to keep the same tuple format
+        recommendations[user_id] = [(m, 0) for m in candidates[:k]]
+
+    return recommendations
 if __name__ == "__main__":
     from surprise import SVD
 
@@ -72,11 +89,21 @@ if __name__ == "__main__":
     model = SVD(**best_params)
     model.fit(trainset)
 
-    # Use a small sample of users first to check this runs correctly before scaling to all
-    sample_users = test_df["user_id"].unique()[:50]
+        # Quick sanity check: predicted ratings for a few (user, movie) pairs
+    sample_checks = test_df.sample(5, random_state=42)
+    for _, row in sample_checks.iterrows():
+        pred = model.predict(row["user_id"], row["movie_id"]).est
+        print(f"User {row['user_id']}, Movie {row['movie_id']}: predicted {pred:.2f}, actual {row['rating']}")
 
-    recs = get_top_k_recommendations(model, trainset, train_df, sample_users, k=10)
-    precision, recall = precision_recall_at_k(recs, test_df, k=10)
+    all_users = test_df["user_id"].unique()
+    print(f"Evaluating on {len(all_users)} users...")
 
-    print(f"Precision@10 (sample of 50 users): {precision:.4f}")
-    print(f"Recall@10 (sample of 50 users): {recall:.4f}")
+    # SVD recommendations
+    svd_recs = get_top_k_recommendations(model, trainset, train_df, all_users, k=10)
+    svd_precision, svd_recall = precision_recall_at_k(svd_recs, test_df, k=10)
+    print(f"SVD       - Precision@10: {svd_precision:.4f}, Recall@10: {svd_recall:.4f}")
+
+    # Popularity baseline
+    pop_recs = get_popularity_baseline_recommendations(train_df, all_users, k=10)
+    pop_precision, pop_recall = precision_recall_at_k(pop_recs, test_df, k=10)
+    print(f"Popularity - Precision@10: {pop_precision:.4f}, Recall@10: {pop_recall:.4f}")
