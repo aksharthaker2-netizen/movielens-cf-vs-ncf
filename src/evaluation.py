@@ -76,6 +76,40 @@ def get_popularity_baseline_recommendations(train_df, user_ids, k=10):
         recommendations[user_id] = [(m, 0) for m in candidates[:k]]
 
     return recommendations
+
+def ndcg_at_k(recommendations, test_df, k=10):
+    """
+    Compute NDCG@k, averaged across all users.
+    Uses actual test ratings as relevance/gain values (not just binary liked/not).
+    """
+    ndcgs = []
+
+    for user_id, recs in recommendations.items():
+        recommended_movie_ids = [movie_id for movie_id, _ in recs]
+
+        user_test = test_df[test_df["user_id"] == user_id]
+        # Map movie_id -> actual rating, for quick lookup
+        true_ratings = dict(zip(user_test["movie_id"], user_test["rating"]))
+
+        if len(true_ratings) == 0:
+            continue  # no test ratings for this user, skip
+
+        # DCG: sum of (actual rating if relevant, else 0) discounted by position
+        dcg = 0.0
+        for rank, movie_id in enumerate(recommended_movie_ids, start=1):
+            relevance = true_ratings.get(movie_id, 0)  # 0 if not in test set at all
+            dcg += relevance / np.log2(rank + 1)
+
+        # IDCG: best possible DCG - rank the user's actual relevant items by rating, descending
+        ideal_relevances = sorted(true_ratings.values(), reverse=True)[:k]
+        idcg = sum(rel / np.log2(rank + 1) for rank, rel in enumerate(ideal_relevances, start=1))
+
+        if idcg == 0:
+            continue  # user had no positive ratings to normalize against
+
+        ndcgs.append(dcg / idcg)
+
+    return np.mean(ndcgs)
 if __name__ == "__main__":
     from surprise import SVD
 
@@ -107,3 +141,9 @@ if __name__ == "__main__":
     pop_recs = get_popularity_baseline_recommendations(train_df, all_users, k=10)
     pop_precision, pop_recall = precision_recall_at_k(pop_recs, test_df, k=10)
     print(f"Popularity - Precision@10: {pop_precision:.4f}, Recall@10: {pop_recall:.4f}")
+
+    svd_ndcg = ndcg_at_k(svd_recs, test_df, k=10)
+    print(f"SVD       - NDCG@10: {svd_ndcg:.4f}")
+
+    pop_ndcg = ndcg_at_k(pop_recs, test_df, k=10)
+    print(f"Popularity - NDCG@10: {pop_ndcg:.4f}")
